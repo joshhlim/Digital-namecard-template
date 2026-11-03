@@ -1,5 +1,5 @@
 {
-  "name": "namecard-template",
+  "name": "digital-namecard-template",
   "version": "1.0.0",
   "description": "A template for building your own digital name card from one config file.",
   "private": true,

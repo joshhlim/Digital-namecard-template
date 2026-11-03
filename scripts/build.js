@@ -42,6 +42,10 @@ function loadCard() {
     phone: text(raw.phone).replace(/[^\d+]/g, ''),
     emails: (raw.emails || []).filter((email) => text(email.address)),
     links: (raw.links || []).filter((link) => text(link.url)),
+    logo: {
+      file: text(raw.logo?.file),
+      background: text(raw.logo?.background) || '#ffffff',
+    },
     photo: {
       file: text(raw.photo?.file),
       focusX: Number(raw.photo?.focusX ?? 0.5),
@@ -64,6 +68,9 @@ function loadCard() {
   }
   for (const link of card.links) {
     if (!/^https?:\/\//.test(text(link.url))) problems.push(`link ${link.url} must start with https://`);
+  }
+  if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(card.logo.background)) {
+    problems.push('logo.background must be a colour like #ffffff');
   }
   if (problems.length) {
     fail(`Please fix ${path.basename(CONFIG)}:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
@@ -130,7 +137,13 @@ ${items}
           </section>`;
 }
 
-function renderHtml(card, photo) {
+function renderLogo(card, logo) {
+  if (!logo) return '';
+  const alt = escapeHtml(card.organization ? `${card.organization} logo` : 'Company logo');
+  return `\n              <img class="logo" src="logo.png" alt="${alt}" width="${logo.width}" height="${logo.height}" style="background: ${card.logo.background}">`;
+}
+
+function renderHtml(card, photo, logo) {
   const details = card.bio ? `${card.role}. ${card.bio}` : card.role;
   const orgLabel = card.organizationShort
     ? `${card.organization} (${card.organizationShort})`
@@ -151,6 +164,7 @@ function renderHtml(card, photo) {
     ogImageUrl: escapeHtml(`${card.url}og-image.jpg`),
     summary: escapeHtml(`${card.name}, ${card.role}`),
     banner: renderBanner(card, photo),
+    logo: renderLogo(card, logo),
     orgLine: orgLabel ? `\n            <p class="org">${escapeHtml(orgLabel)}</p>` : '',
     bioLine: card.bio ? `\n            <p class="bio">${escapeHtml(card.bio)}</p>` : '',
     emailSection: renderEmails(card),
@@ -266,6 +280,19 @@ async function preparePhoto(card) {
   return { square, page, contact, edgeColor, focusY: Number(focusY.toFixed(4)) };
 }
 
+async function prepareLogo(card) {
+  if (!card.logo.file) return null;
+  const file = path.resolve(path.dirname(CONFIG), card.logo.file);
+  if (!fs.existsSync(file)) fail(`Couldn't find the logo at ${card.logo.file}`);
+
+  // A high density keeps SVG logos sharp when they're converted to PNG.
+  const { data, info } = await sharp(file, { density: 400 })
+    .resize(416, 208, { fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
+}
+
 const escapeXml = escapeHtml;
 
 function iconSvg(initials, size) {
@@ -357,12 +384,13 @@ function renderManifest(card) {
 async function main() {
   const card = loadCard();
   const photo = await preparePhoto(card);
+  const logo = await prepareLogo(card);
 
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(OUT, { recursive: true });
   const write = (name, contents) => fs.writeFileSync(path.join(OUT, name), contents);
 
-  write('index.html', renderHtml(card, photo));
+  write('index.html', renderHtml(card, photo, logo));
   fs.copyFileSync(path.join(SRC, 'styles.css'), path.join(OUT, 'styles.css'));
   const headers = fs.readFileSync(path.join(SRC, '_headers'), 'utf8');
   write('_headers', headers.replace('__CONTACT_FILENAME__', contactFilename(card)));
@@ -376,6 +404,7 @@ async function main() {
   }));
   write('og-image.jpg', await renderOgImage(card, photo));
   if (photo) write('photo.jpg', photo.page);
+  if (logo) write('logo.png', logo.data);
 
   for (const [name, size] of [['icon-512.png', 512], ['icon-192.png', 192], ['apple-touch-icon.png', 180], ['favicon-32.png', 32]]) {
     write(name, await sharp(Buffer.from(iconSvg(card.initials, size))).png().toBuffer());
@@ -383,6 +412,7 @@ async function main() {
 
   const assets = ['./', 'styles.css', 'qr.svg', 'contact.vcf', 'manifest.webmanifest', 'favicon-32.png'];
   if (photo) assets.push('photo.jpg');
+  if (logo) assets.push('logo.png');
   const worker = fs.readFileSync(path.join(SRC, 'sw.js'), 'utf8');
   write('sw.js', worker.replace('__ASSETS__', JSON.stringify(assets)));
 

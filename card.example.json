@@ -16,6 +16,10 @@
     { "type": "github", "url": "" },
     { "type": "website", "label": "Portfolio", "url": "" }
   ],
+  "logo": {
+    "file": "",
+    "background": "#ffffff"
+  },
   "photo": {
     "file": "",
     "focusX": 0.5,

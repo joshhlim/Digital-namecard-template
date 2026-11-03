@@ -8,6 +8,8 @@ dist/
 /*.jpeg
 /*.webp
 /*.heic
+/*.svg
+/*.gif
 
 node_modules/
 .DS_Store
