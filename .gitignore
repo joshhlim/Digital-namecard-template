@@ -1,0 +1,14 @@
+# Your personal details and generated site. Never commit these.
+card.json
+dist/
+
+# Photos and other images you keep in the project root.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.heic
+
+node_modules/
+.DS_Store
+.wrangler/

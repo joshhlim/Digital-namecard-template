@@ -1,0 +1,18 @@
+{
+  "name": "namecard-template",
+  "version": "1.0.0",
+  "description": "A template for building your own digital name card from one config file.",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "preview": "npx --yes http-server dist -p 8000 -c-1"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5"
+  }
+}

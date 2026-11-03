@@ -1,0 +1,24 @@
+{
+  "firstName": "",
+  "lastName": "",
+  "title": "",
+  "organization": "",
+  "organizationShort": "",
+  "bio": "",
+  "url": "",
+  "phone": "",
+  "emails": [
+    { "label": "Work", "type": "work", "address": "" },
+    { "label": "Personal", "type": "personal", "address": "" }
+  ],
+  "links": [
+    { "type": "linkedin", "url": "" },
+    { "type": "github", "url": "" },
+    { "type": "website", "label": "Portfolio", "url": "" }
+  ],
+  "photo": {
+    "file": "",
+    "focusX": 0.5,
+    "focusY": 0.3
+  }
+}

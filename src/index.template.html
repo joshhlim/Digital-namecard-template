@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#11171e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{name}}">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="description" content="{{description}}">
+  <title>{{pageTitle}}</title>
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{url}}">
+  <meta property="og:title" content="{{pageTitle}}">
+  <meta property="og:description" content="{{ogDescription}}">
+  <meta property="og:image" content="{{ogImageUrl}}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{{summary}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <div class="flipper" id="flipper">
+      <div class="card" role="tabpanel" id="panel-card" aria-labelledby="tab-card">
+{{banner}}
+
+        <div class="details">
+          <header class="identity">
+            <h1>{{name}}</h1>
+            <p class="title">{{title}}</p>{{orgLine}}{{bioLine}}
+          </header>{{emailSection}}{{linksSection}}
+        </div>
+      </div>
+
+      <div class="card qr" role="tabpanel" id="panel-qr" aria-labelledby="tab-qr" inert>
+        <p class="qr-name">{{name}}</p>
+        <p class="qr-title">{{title}}</p>
+        <img src="qr.svg" alt="QR code linking to this card" width="320" height="320">
+        <p>Scan to open my card</p>
+      </div>
+    </div>
+
+    <div class="dots" role="tablist" aria-label="Card pages">
+      <button type="button" role="tab" id="tab-card" aria-label="Card" aria-controls="panel-card" aria-selected="true"></button>
+      <button type="button" role="tab" id="tab-qr" aria-label="QR code" aria-controls="panel-qr" aria-selected="false" tabindex="-1"></button>
+    </div>
+  </main>
+
+  <div class="actions">
+    <p class="toast" id="toast" role="status"></p>
+    <a class="button" href="contact.vcf">Save contact</a>
+    <button class="share" type="button" id="share" aria-label="Share card" title="Share card">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+    </button>
+  </div>
+
+  <script>
+    const flipper = document.getElementById('flipper');
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const panels = [...document.querySelectorAll('[role="tabpanel"]')];
+    let showing = 0;
+    let angle = 0;
+
+    // The angle keeps accumulating so each flip turns the way it was asked to.
+    function showPanel(index, direction = index ? -1 : 1) {
+      if (index === showing) return;
+      showing = index;
+      angle += 180 * direction;
+      flipper.style.transform = `rotateY(${angle}deg)`;
+      syncWakeLock();
+      tabs.forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === index));
+        tab.tabIndex = i === index ? 0 : -1;
+      });
+      panels.forEach((panel, i) => { panel.inert = i !== index; });
+    }
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => showPanel(i));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        const next = (i + 1) % tabs.length;
+        tabs[next].focus();
+        showPanel(next, event.key === 'ArrowLeft' ? -1 : 1);
+      });
+    });
+
+    // The card turns with the finger once a drag is clearly horizontal. A vertical
+    // drag scrolls the page instead, which cancels the pointer. Mice are left out so
+    // that email addresses can still be selected and copied.
+    const MIN_DRAG = 10;
+    const FLIP_AFTER_DEGREES = 60;
+    const FLICK_SPEED = 0.5;
+    let drag = null;
+
+    function endDrag() {
+      flipper.classList.remove('dragging');
+      flipper.style.transform = `rotateY(${angle}deg)`;
+      drag = null;
+    }
+
+    flipper.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') return;
+      drag = { x: event.clientX, y: event.clientY, time: event.timeStamp, dx: 0, turn: 0, turning: false };
+    });
+
+    flipper.addEventListener('pointermove', (event) => {
+      if (!drag) return;
+      const dx = event.clientX - drag.x;
+      if (!drag.turning) {
+        if (Math.abs(dx) < MIN_DRAG || Math.abs(dx) < Math.abs(event.clientY - drag.y) * 1.5) return;
+        drag.turning = true;
+        flipper.setPointerCapture(event.pointerId);
+        flipper.classList.add('dragging');
+      }
+      drag.dx = dx;
+      drag.turn = Math.max(-180, Math.min(180, (dx / flipper.offsetWidth) * 180));
+      flipper.style.transform = `rotateY(${angle + drag.turn}deg)`;
+    });
+
+    flipper.addEventListener('pointerup', (event) => {
+      if (!drag) return;
+      const { dx, turn, time, turning } = drag;
+      const speed = Math.abs(dx) / (event.timeStamp - time);
+      endDrag();
+      if (turning && (Math.abs(turn) > FLIP_AFTER_DEGREES || speed > FLICK_SPEED)) {
+        showPanel(1 - showing, dx < 0 ? -1 : 1);
+      }
+    });
+
+    flipper.addEventListener('pointercancel', () => {
+      if (drag) endDrag();
+    });
+
+    // Keeps the screen awake while the QR code is showing, where the browser allows it.
+    let wakeLock = null;
+    async function syncWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      try {
+        if (showing === 1 && document.visibilityState === 'visible') {
+          if (wakeLock) return;
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+          if (showing !== 1) await wakeLock.release();
+        } else if (wakeLock) {
+          await wakeLock.release();
+        }
+      } catch {
+        // Not essential: the card still works if the browser refuses.
+      }
+    }
+    document.addEventListener('visibilitychange', syncWakeLock);
+
+    const toast = document.getElementById('toast');
+    let toastTimer;
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 2000);
+    }
+
+    const shareData = {{shareData}};
+    document.getElementById('share').addEventListener('click', async () => {
+      try {
+        if (navigator.share) {
+          await navigator.share(shareData);
+        } else {
+          await navigator.clipboard.writeText(shareData.url);
+          showToast('Link copied');
+        }
+      } catch (error) {
+        // AbortError just means the share sheet was dismissed.
+        if (error.name !== 'AbortError') showToast("Couldn't share");
+      }
+    });
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  </script>
+</body>
+</html>
